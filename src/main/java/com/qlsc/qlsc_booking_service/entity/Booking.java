@@ -20,11 +20,11 @@ public class Booking extends BaseEntity {
     @Id
     Integer id;
     @Column(name = BookingConstant.USER_ID)
-    String userId;
+    Long userId;
     @Column(name = BookingConstant.COURT_ID)
-    String courtId;
+    Long courtId;
     @Column(name = BookingConstant.COURT_NUMBER)
-    String courtNumber;
+    Integer courtNumber;
     @Column(name = BookingConstant.BOOKING_DATE)
     Long bookingDate;
     @Column(name = BookingConstant.START_TIME)

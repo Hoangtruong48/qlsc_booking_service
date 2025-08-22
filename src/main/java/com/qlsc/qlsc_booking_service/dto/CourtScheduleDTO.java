@@ -3,6 +3,7 @@ package com.qlsc.qlsc_booking_service.dto;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -12,8 +13,12 @@ import java.util.List;
 @NoArgsConstructor
 public class CourtScheduleDTO {
     Integer courtId;
-    Integer courtNumber;
     Integer openingTime;
     Integer closingTime;
-    List<Integer> slots;
+    List<InfoSlot> infoSlots = new ArrayList<>();
+    @Data
+    public static class InfoSlot {
+        Integer courtNumber;
+        List<Integer> slots;
+    }
 }
