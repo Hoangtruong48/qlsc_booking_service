@@ -12,6 +12,12 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    consumer:
+      bootstrap-servers: localhost:9092
+      group-id: booking-service-group
+      properties:
+        spring.json.trusted.packages: "*"
 
 server:
   port: 8083
