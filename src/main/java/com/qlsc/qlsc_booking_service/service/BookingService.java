@@ -1,18 +1,25 @@
-package com.qlsc.qlsc_booking_service;
+package com.qlsc.qlsc_booking_service.service;
 
+import com.qlsc.qlsc_booking_service.controller.BookingController;
 import com.qlsc.qlsc_booking_service.dto.BadmintonInfoTimeDTO;
 import com.qlsc.qlsc_booking_service.dto.CourtScheduleDTO;
 import com.qlsc.qlsc_booking_service.dto.DetailInfoDTO;
 import com.qlsc.qlsc_booking_service.dto.ScheduleTimeAvailableDTO;
+import com.qlsc.qlsc_booking_service.entity.Booking;
 import com.qlsc.qlsc_booking_service.feign.BadmintonCourtManagementClient;
+import com.qlsc.qlsc_booking_service.producer.BookingProducer;
 import com.qlsc.qlsc_booking_service.repo.jpa.BookingRepoJpa;
+import com.qlsc.qlsc_booking_service.request.BookingRequest;
+import com.qlsc.qlsc_common.constant.KafkaConstant;
+import com.qlsc.qlsc_common.constant.SagaConstant;
 import com.qlsc.qlsc_common.response.ApiResponse;
+import com.qlsc.qlsc_common.saga.BookingCreatedEvent;
+import com.qlsc.qlsc_common.saga.CreateBookingCommand;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -25,6 +32,7 @@ public class BookingService {
     Logger LOG = LoggerFactory.getLogger(this.getClass());
     BadmintonCourtManagementClient badmintonFeign;
     BookingRepoJpa bookingRepoJpa;
+    BookingProducer bookingProducer;
 
     public ApiResponse<?> getBadmintonFree(List<Integer> ids, Long bookingDate) {
         ApiResponse<List<CourtScheduleDTO>> response = new ApiResponse<>();
@@ -64,7 +72,7 @@ public class BookingService {
      * @param detailInfo                : lưu thông tin sân cầu to mở từ giờ nào đến giờ nào
      * @return : xử lí build thông tin từng sân cầu chi tiết :
      * b1 : mặc định cho từ index 0 -> 23 : được mở
-     * b2 : Đóng index 0 -> open time - 1, close time -> 23
+     * b2 : Đóng index [0 -> open time - 1], [close time -> 23]
      * b3 : build tất cả mảng đã được thuê : ví dụ thuê từ 1 --> 3 thì đóng 1, 2 : add [startTime --> endTime - 1]
      */
     // build từng sân nhỏ trong sân to
@@ -78,6 +86,7 @@ public class BookingService {
         int endTime = detailInfo.getEndTime();
         courtScheduleDTO.setOpeningTime(openTime);
         courtScheduleDTO.setClosingTime(endTime);
+        // đây là đoạn build từ sân 1 --> sân cuối trong 1 sân to
         List<Integer> lstCourtNumber = detailInfo.getListCourtNumber();
         List<CourtScheduleDTO.InfoSlot> lstInfos = new ArrayList<>();
         for (Integer x : lstCourtNumber) {
@@ -134,4 +143,43 @@ public class BookingService {
         }
         return res;
     }
+
+    public void createBooking(CreateBookingCommand cmd) {
+        int status = SagaConstant.BookingSaga.BOOKING;
+        String msg = "";
+        Long courtId = cmd.getCourtId();
+        Integer courtNumber = cmd.getCourtNumber();
+        Integer startTime = cmd.getStartTime();
+        Integer endTime = cmd.getEndTime();
+        Long bookingDate = cmd.getBookingDate();
+        String sagaId = cmd.getSagaId();
+        Double price = cmd.getPrice();
+        BookingCreatedEvent event = new BookingCreatedEvent();
+        event.setSagaId(sagaId);
+        // 1. check xem có sân đặt chưa
+        boolean conflicted = bookingRepoJpa.isBookingConflicted(courtId, courtNumber,
+                bookingDate, startTime, endTime);
+        if (conflicted) {
+            status = SagaConstant.FAILED;
+            msg = "Create booking failed because duplicate booking already exists.";
+            event.setStatus(status);
+            event.setMsg(msg);
+        } else {
+            event.setStatus(status);
+            Booking booking = new Booking();
+            booking.setCourtId(courtId);
+            booking.setCourtNumber(courtNumber);
+            booking.setBookingDate(bookingDate);
+            booking.setStartTime(startTime);
+            booking.setEndTime(endTime);
+            booking.setPrice(price);
+            booking.setUpdatedAt(System.currentTimeMillis());
+            booking.setUpdatedBy(cmd.getUserName());
+            bookingRepoJpa.save(booking);
+        }
+        bookingProducer.sendEvent(KafkaConstant.TOPIC_BOOKING_EVENT, event);
+
+    }
+
+//    }
 }

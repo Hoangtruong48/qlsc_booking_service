@@ -18,4 +18,22 @@ public interface BookingRepoJpa extends JpaRepository<Booking, Long> {
               and b.status > 0;
             """, nativeQuery = true)
     List<Object[]> findAllCourtAvailable(@Param("courtIds") List<Integer> courtIds, @Param("bookingDate") Long bookingDate);
+
+    @Query(value = """
+    select exists (
+        select 1
+        from badminton.booking b
+        where b.court_id = :courtId
+          and b.court_number = :courtNumber
+          and b.booking_date = :bookingDate
+          and b.status > 0
+          and (b.start_time, b.end_time) overlaps (:newStartTime, :newEndTime)
+    )
+    """, nativeQuery = true)
+    boolean isBookingConflicted(@Param("courtId") Long courtId,
+                                @Param("courtNumber") Integer courtNumber,
+                                @Param("bookingDate") Long bookingDate,
+                                @Param("newStartTime") Integer newStartTime,
+                                @Param("newEndTime") Integer newEndTime);
+
 }

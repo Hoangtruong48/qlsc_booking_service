@@ -1,7 +1,7 @@
 package com.qlsc.qlsc_booking_service.config;
 
-import com.qlsc.qlsc_booking_service.exception.NotRetryableException;
-import com.qlsc.qlsc_booking_service.exception.RetryableException;
+import com.qlsc.qlsc_common.exception.NotRetryableException;
+import com.qlsc.qlsc_common.exception.RetryableException;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;

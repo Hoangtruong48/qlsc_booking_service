@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/your_database?currentSchema=badminton
+    url: jdbc:postgresql://localhost:5432/postgres?currentSchema=badminton
     username: postgres
     password: your_password
     driver-class-name: org.postgresql.Driver

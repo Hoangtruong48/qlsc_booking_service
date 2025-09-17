@@ -1,6 +1,7 @@
 package com.qlsc.qlsc_booking_service.dto;
 
 import com.qlsc.qlsc_common.util.AppUtils;
+import com.qlsc.qlsc_common.util.NumberQlscUtils;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -24,10 +25,10 @@ public class ScheduleTimeAvailableDTO /*implements
         return rawData.stream()
                 .map(x ->
                         new ScheduleTimeAvailableDTO(
-                                AppUtils.parseIntNew(x[0]),
-                                AppUtils.parseIntNew(x[1]),
-                                AppUtils.parseIntNew(x[2]),
-                                AppUtils.parseIntNew(x[3])
+                                NumberQlscUtils.parseInteger(x[0]),
+                                NumberQlscUtils.parseInteger(x[1]),
+                                NumberQlscUtils.parseInteger(x[2]),
+                                NumberQlscUtils.parseInteger(x[3])
                         )
                 ).collect(Collectors.toList());
     }
