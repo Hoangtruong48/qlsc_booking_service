@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="60">
+    <Properties>
+        <Property name="projectName">bot_crawl</Property>
+        <Property name="basePath">${sys:user.home}/log/${projectName}</Property>
+        
+        <Property name="defaultPattern">%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%X{traceId}] [%-10.10t] %-10.10c{1} - %msg%n</Property>
+        <Property name="consolePattern">%d{yyyy-MM-dd HH:mm:ss.SSS} [%p] [%X{traceId}] %c:%L - %m%n</Property>
+    </Properties>
+
+    <Appenders>
+        <RollingFile fileName="${basePath}/${projectName}.log"
+                     filePattern="${basePath}/${projectName}.log-%d{yyyy-MM-dd-HH}.gz" name="MAIN">
+            <PatternLayout pattern="${defaultPattern}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="10" modulate="true"/>
+            </Policies>
+        </RollingFile>
+
+        <Async name="ASYNC_MAIN">
+            <AppenderRef ref="MAIN"/>
+        </Async>
+
+        <RollingFile fileName="${basePath}/alarm/alarm.log"
+                     filePattern="${basePath}/alarm/alarm.log-%d{yyyy-MM-dd-HH}.gz" name="ALARM">
+            <PatternLayout pattern="${defaultPattern}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+            </Policies>
+        </RollingFile>
+
+        <Async name="ASYNC_ALARM">
+            <AppenderRef ref="ALARM"/>
+        </Async>
+
+        <Console name="CONSOLE" target="SYSTEM_OUT">
+            <PatternLayout pattern="${consolePattern}"/>
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <Logger additivity="false" level="INFO" name="io.lettuce">
+            <appender-ref ref="ASYNC_MAIN"/>
+        </Logger>
+        <Logger additivity="false" level="INFO" name="org.springframework">
+            <appender-ref ref="ASYNC_MAIN"/>
+        </Logger>
+        <Logger additivity="false" level="DEBUG" name="org.springframework.web.filter.CommonsRequestLoggingFilter">
+            <appender-ref ref="ASYNC_MAIN"/>
+        </Logger>
+        <Logger additivity="false" level="WARN" name="org.springframework.data.mongodb.core">
+            <appender-ref ref="ASYNC_MAIN"/>
+        </Logger>
+        <Logger additivity="false" level="WARN" name="org.mongodb.driver.protocol.command">
+            <appender-ref ref="ASYNC_MAIN"/>
+        </Logger>
+	<Logger additivity="false" level="INFO" name="org.hibernate">
+            <appender-ref ref="ASYNC_MAIN"/>
+        </Logger>
+        <Logger additivity="false" level="INFO" name="org.apache">
+            <appender-ref ref="ASYNC_MAIN"/>
+        </Logger>
+
+        <Logger name="org.hibernate.engine.internal.StatisticalLoggingSessionEventListener" level="warn"/>
+
+        <Root level="INFO"> <appender-ref ref="ASYNC_MAIN"/>
+            <appender-ref ref="CONSOLE"/>
+        </Root>
+    </Loggers>
+</Configuration>

@@ -98,6 +98,12 @@
 			<groupId>org.springframework.kafka</groupId>
 			<artifactId>spring-kafka</artifactId>
 		</dependency>
+
+		<dependency>
+			<groupId>com.htruong48</groupId>
+			<artifactId>common_log</artifactId>
+			<version>1.0.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>
