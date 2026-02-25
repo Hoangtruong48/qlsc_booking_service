@@ -48,7 +48,7 @@ public class BookingService {
         List<Object[]> rawData = bookingRepoJpa.findAllCourtAvailable(ids, bookingDate);
         List<ScheduleTimeAvailableDTO> lstCourtExists = ScheduleTimeAvailableDTO.convertRawDataToDTO(rawData);
         if (lstCourtExists == null || lstCourtExists.isEmpty()) {
-            LOG.info("Return because lstCourtExists null");
+            LOG.info(" lstCourtExists null");
             lstCourtExists = new ArrayList<>();
 //            return response.setDataSuccess(new ArrayList<>());
         }
@@ -172,11 +172,15 @@ public class BookingService {
             booking.setBookingDate(bookingDate);
             booking.setStartTime(startTime);
             booking.setEndTime(endTime);
+            // TODO : xử lí lấy lại price chỗ này bằng cách tính giá tiền sân, lưu ý có cấu hình giờ vàng tăng giá
             booking.setPrice(price);
             booking.setUpdatedAt(System.currentTimeMillis());
             booking.setUpdatedBy(cmd.getUserName());
-            bookingRepoJpa.save(booking);
+            booking.setStatus(Booking.STATUS_PENDING);
+            Booking save =  bookingRepoJpa.save(booking);
+            event.setBookingId(save.getId());
         }
+
         bookingProducer.sendEvent(KafkaConstant.TOPIC_BOOKING_EVENT, event);
 
     }

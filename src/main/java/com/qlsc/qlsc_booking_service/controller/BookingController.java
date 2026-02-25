@@ -1,5 +1,6 @@
 package com.qlsc.qlsc_booking_service.controller;
 
+import com.htruong48.common_log.annotaion.TraceName;
 import com.qlsc.qlsc_booking_service.service.BookingService;
 import com.qlsc.qlsc_common.response.ApiResponse;
 import lombok.AccessLevel;
@@ -21,6 +22,7 @@ public class BookingController {
     Logger LOG = LoggerFactory.getLogger(this.getClass());
     BookingService bookingService;
     @GetMapping("/get-time-badminton")
+    @TraceName("get-free-badminton")
     public ApiResponse<?> getBadmintonFree(@RequestParam List<Integer> ids, @RequestParam Long bookingDate) {
         LOG.info("Start get time badminton  ids = {}", ids);
         ApiResponse<?> response = bookingService.getBadmintonFree(ids, bookingDate);

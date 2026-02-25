@@ -1,10 +1,7 @@
 package com.qlsc.qlsc_booking_service.entity;
 
 import com.qlsc.qlsc_common.entity.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -17,8 +14,13 @@ import lombok.experimental.FieldDefaults;
 @Table(name = Booking.BookingConstant.TABLE_NAME, schema = Booking.BookingConstant.SCHEMA)
 @Entity
 public class Booking extends BaseEntity {
+    public static int STATUS_FAILED = -1;
+    public static int STATUS_PENDING = 0;
+    public static int STATUS_SUCCESS = 1;
+
     @Id
-    Integer id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id;
     @Column(name = BookingConstant.USER_ID)
     Long userId;
     @Column(name = BookingConstant.COURT_ID)
@@ -35,6 +37,7 @@ public class Booking extends BaseEntity {
     Integer status;
     @Column(name = BookingConstant.PRICE)
     Double price;
+
 
     public static class BookingConstant {
         public static final String TABLE_NAME = "booking";

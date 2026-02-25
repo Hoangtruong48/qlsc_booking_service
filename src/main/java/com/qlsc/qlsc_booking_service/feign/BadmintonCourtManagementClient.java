@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
-
+// đưa cái này vào file yml
 @FeignClient(
         name = "court-management-service",
         url = "http://localhost:8082")
