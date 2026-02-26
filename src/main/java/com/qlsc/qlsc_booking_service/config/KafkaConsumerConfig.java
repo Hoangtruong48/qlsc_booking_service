@@ -2,22 +2,22 @@ package com.qlsc.qlsc_booking_service.config;
 
 import com.qlsc.qlsc_common.exception.NotRetryableException;
 import com.qlsc.qlsc_common.exception.RetryableException;
+import lombok.extern.log4j.Log4j2;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.*;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
-import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 
 @EnableKafka
 @Configuration
+@Log4j2
 public class KafkaConsumerConfig {
 
     @Value("${spring.kafka.consumer.bootstrap-servers}")
@@ -72,6 +73,16 @@ public class KafkaConsumerConfig {
         factory.setBatchListener(true);
         // tat auto commit
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+
+        // Cấu hình nhịp thử lại: Đợi 5000ms (5 giây), thử lại tối đa 3 lần
+        FixedBackOff backOff = new FixedBackOff(5000L, 3);
+
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+                (record, exception) -> log.error("Kafka consumer error when insert batch to database " +
+                        "- {}  - {}", exception, exception.getMessage()), backOff
+        );
+
+        factory.setCommonErrorHandler(errorHandler);
         return factory;
     }
 

@@ -1,6 +1,7 @@
 package com.qlsc.qlsc_booking_service.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.qlsc.qlsc_booking_service.dto.ProcessKafkaMessage;
 import com.qlsc.qlsc_booking_service.entity.BlackFridaySale;
 import com.qlsc.qlsc_booking_service.repo.custom.BlackFridaySaleCustomRepo;
 import com.qlsc.qlsc_booking_service.service.BookingService;
@@ -26,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -65,7 +67,7 @@ public class BookingConsumer {
         LOG.info("List listener size = {}", records.size());
 
         // 1. Phân phát việc Parse JSON và chuyển đổi cho các Worker Thread
-        List<CompletableFuture<BlackFridaySale>> futures = records.stream()
+        List<CompletableFuture<ProcessKafkaMessage<BlackFridaySale>>> futures = records.stream()
                 .map(record -> CompletableFuture.supplyAsync(() -> {
                     try {
                         // Tự tay dùng ObjectMapper parse chuỗi JSON thành Object
@@ -73,32 +75,60 @@ public class BookingConsumer {
                         BlackFridaySaleCommand command = objectMapper.readValue(jsonPayload, BlackFridaySaleCommand.class);
 
 //                        LOG.info("Đang xử lý userId: {}", command.getUserId());
-                        return convertCommandToEntity(command);
+                        BlackFridaySale b =  convertCommandToEntity(command);
+                        ProcessKafkaMessage<BlackFridaySale> processKafkaMessage = new ProcessKafkaMessage<>();
+                        if (b != null) {
+                            processKafkaMessage.setStatus(ProcessKafkaMessage.SUCCESS);
+                            processKafkaMessage.setDataSuccess(b);
+                        } else {
+                            processKafkaMessage.setStatus(ProcessKafkaMessage.FAILURE);
+                            processKafkaMessage.setMessageFailure(jsonPayload);
+                        }
+                        return processKafkaMessage;
 
                     } catch (Exception e) {
                         LOG.error("Lỗi parse JSON tại offset {}. Nội dung: {}", record.offset(), record.value(), e);
-                        return null;
+                        ProcessKafkaMessage<BlackFridaySale> processKafkaMessage = new ProcessKafkaMessage<>();
+                        processKafkaMessage.setStatus(ProcessKafkaMessage.FAILURE);
+                        processKafkaMessage.setMessageFailure(record.value());
+                        return processKafkaMessage;
+//                        return null;
                     }
                 }, kafkaWorkerPool))
                 .toList();
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        List<BlackFridaySale> lstEntity = futures.stream()
+        List<ProcessKafkaMessage<BlackFridaySale>> lstEntity = futures.stream()
                 .map(CompletableFuture::join)
                 .filter(Objects::nonNull)
                 .toList();
 
         // 4. Batch Insert xuống DB
         if (!lstEntity.isEmpty()) {
+
+            List<BlackFridaySale> lstInsert = lstEntity.stream()
+                    .filter(x -> x.getStatus() == ProcessKafkaMessage.SUCCESS)
+                    .map(ProcessKafkaMessage::getDataSuccess)
+                    .filter(Objects::nonNull)
+                    .toList();
+
+            List<String> lstMessageFailure = lstEntity.stream()
+                    .filter(x -> x.getStatus() == ProcessKafkaMessage.FAILURE)
+                    .map(ProcessKafkaMessage::getMessageFailure)
+                    .filter(Objects::nonNull)
+                    .toList();
+
             try {
-                int totalSuccess = blackFridaySaleCustomRepo.insertInBatch(lstEntity);
-                LOG.info("Đã insert thành công {}/{} bản ghi hợp lệ vào DB. (Tổng nhận từ Kafka: {})",
-                        totalSuccess, lstEntity.size(), records.size());
+                blackFridaySaleCustomRepo.insertBatchSuccessAndFailure
+                        (lstInsert, lstMessageFailure, KafkaConstant.TOPIC_BOOKING_MULTI_THREAD);
             } catch (Exception e) {
                 LOG.error("Lỗi nghiêm trọng khi insert batch xuống DB!", e);
                 throw e;
             }
+
+
+
         } else {
             LOG.warn("Không có bản ghi nào hợp lệ để insert trong lô này.");
         }
