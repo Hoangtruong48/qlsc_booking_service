@@ -1,13 +1,16 @@
 package com.qlsc.qlsc_booking_service.service;
 
+import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.ExcelWriter;
+import com.alibaba.excel.write.metadata.WriteSheet;
 import com.qlsc.qlsc_booking_service.controller.BookingController;
-import com.qlsc.qlsc_booking_service.dto.BadmintonInfoTimeDTO;
-import com.qlsc.qlsc_booking_service.dto.CourtScheduleDTO;
-import com.qlsc.qlsc_booking_service.dto.DetailInfoDTO;
-import com.qlsc.qlsc_booking_service.dto.ScheduleTimeAvailableDTO;
+import com.qlsc.qlsc_booking_service.dto.*;
+import com.qlsc.qlsc_booking_service.entity.BlackFridaySale;
 import com.qlsc.qlsc_booking_service.entity.Booking;
+import com.qlsc.qlsc_booking_service.excel.BlackFridaySaleExcelDTO;
 import com.qlsc.qlsc_booking_service.feign.BadmintonCourtManagementClient;
 import com.qlsc.qlsc_booking_service.producer.BookingProducer;
+import com.qlsc.qlsc_booking_service.repo.jpa.BlackFridaySaleRepo;
 import com.qlsc.qlsc_booking_service.repo.jpa.BookingRepoJpa;
 import com.qlsc.qlsc_booking_service.request.BookingRequest;
 import com.qlsc.qlsc_common.constant.KafkaConstant;
@@ -15,15 +18,25 @@ import com.qlsc.qlsc_common.constant.SagaConstant;
 import com.qlsc.qlsc_common.response.ApiResponse;
 import com.qlsc.qlsc_common.saga.BookingCreatedEvent;
 import com.qlsc.qlsc_common.saga.CreateBookingCommand;
+import com.qlsc.qlsc_common.util.NumberQlscUtils;
+import jakarta.persistence.EntityManager;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -33,6 +46,8 @@ public class BookingService {
     BadmintonCourtManagementClient badmintonFeign;
     BookingRepoJpa bookingRepoJpa;
     BookingProducer bookingProducer;
+    BlackFridaySaleRepo blackFridaySaleRepo;
+    EntityManager entityManager;
 
     public ApiResponse<?> getBadmintonFree(List<Integer> ids, Long bookingDate) {
         ApiResponse<List<CourtScheduleDTO>> response = new ApiResponse<>();
@@ -177,7 +192,7 @@ public class BookingService {
             booking.setUpdatedAt(System.currentTimeMillis());
             booking.setUpdatedBy(cmd.getUserName());
             booking.setStatus(Booking.STATUS_PENDING);
-            Booking save =  bookingRepoJpa.save(booking);
+            Booking save = bookingRepoJpa.save(booking);
             event.setBookingId(save.getId());
         }
 
@@ -185,5 +200,136 @@ public class BookingService {
 
     }
 
-//    }
+
+    public ApiResponse<?> cusorPagingWithMultiThreadGetData() {
+        long startTime = System.currentTimeMillis();
+        ApiResponse<String> response = new ApiResponse<>();
+
+        int threadCount = 5;
+        int limit = 2000;
+
+        DataBlackFridayDTO o = blackFridaySaleRepo.getMinMaxId();
+        if (o == null || o.getNumber1() == null || o.getNumber2() == null) {
+            return response.setMessageFailed("Khong co du lieu de xu li");
+        }
+
+        long minId = o.getNumber1();
+        long maxId = o.getNumber2();
+        long chunkSize = (maxId - minId) / threadCount;
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < threadCount; i++) {
+                long start = minId + (i * chunkSize);
+                long end = (i == threadCount - 1) ? maxId : (start + chunkSize - 1);
+
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> processTaskByRange(start, end, limit), executor);
+
+                futures.add(future);
+            }
+
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        } catch (Exception e) {
+            LOG.error("Có lỗi xảy ra trong quá trình phân chia và chạy luồng: ", e);
+            return response.setMessageFailed("Lỗi xử lý dữ liệu");
+        } finally {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(10, TimeUnit.MINUTES)) {
+                    LOG.warn("Hết thời gian chờ 10 phút, buộc ngắt các luồng đang chạy!");
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException ie) {
+                LOG.error("Luồng dọn dẹp bị gián đoạn, ép buộc ngắt luồng ngay lập tức!");
+                executor.shutdownNow();
+                Thread.currentThread().interrupt(); // Khôi phục trạng thái ngắt
+            }
+        }
+
+        LOG.info("Time to get data: {} ms", System.currentTimeMillis() - startTime);
+        return response.setMessageSuccess("Xử lý thành công");
+    }
+
+    private void processTaskByRange(long startId, long endId, int step) {
+        LOG.info("Thread {} start = {}, end = {}", Thread.currentThread().getName(), startId, endId);
+
+        long currentStart = startId;
+
+        while (currentStart <= endId) {
+            long currentEnd = Math.min(endId + 1, currentStart + step);
+
+            List<BlackFridaySale> batch = blackFridaySaleRepo.findAllByCusorId(currentStart, currentEnd);
+
+            if (!batch.isEmpty()) {
+                LOG.info("Thread {} processed {} records", Thread.currentThread().getName(), batch.size());
+            }
+
+            currentStart = currentEnd;
+        }
+
+        LOG.info("Thread {} completed range", Thread.currentThread().getName());
+    }
+
+    @Transactional(readOnly = true)
+    public ApiResponse<?> streamDataAlibabaExcel() {
+        long startTime = System.currentTimeMillis();
+        int batchSize = 1000;
+
+        String filePath = "black_friday_" + System.currentTimeMillis() + ".xlsx";
+        // 1. Khởi tạo EasyExcel Writer
+        File file = new File(filePath);
+        ExcelWriter excelWriter = null;
+        try  {
+            excelWriter = EasyExcel.write(file, BlackFridaySaleExcelDTO.class).build();
+            Stream<BlackFridaySale> stream = blackFridaySaleRepo.streamAllData();
+            // Khởi tạo Sheet
+            WriteSheet writeSheet = EasyExcel.writerSheet("Dữ liệu Black Friday").build();
+
+            // Buffer tạm để gom data trước khi ghi (tránh ghi từng dòng lẻ tẻ làm chậm I/O disk)
+            List<BlackFridaySaleExcelDTO> buffer = new ArrayList<>(batchSize);
+
+            // 2. Duyệt Stream
+            ExcelWriter finalExcelWriter = excelWriter;
+            stream.forEach(sale -> {
+                // Map từ Entity sang DTO
+                buffer.add(mapToDto(sale));
+
+                // Khi buffer đầy 1000 dòng -> Ghi ra file và dọn rác
+                if (buffer.size() >= batchSize) {
+                    finalExcelWriter.write(buffer, writeSheet); // Ghi xuống đĩa
+                    buffer.clear();                        // Xóa List tạm
+                    entityManager.clear();                 // Xả First-Level Cache của Hibernate
+                }
+            });
+
+            // 3. Ghi nốt phần dư (nếu tổng số dòng không chia hết cho 1000)
+            if (!buffer.isEmpty()) {
+                excelWriter.write(buffer, writeSheet);
+                buffer.clear();
+                entityManager.clear();
+            }
+
+        } catch (Exception e) {
+            LOG.error("Lỗi khi xuất file Excel: ", e);
+            return new ApiResponse<>().setMessageFailed("Lỗi xuất dữ liệu");
+        } finally {
+            if (excelWriter != null) excelWriter.finish();
+        }
+
+
+        LOG.info("Xuất file Excel thành công! Thời gian: {} ms", System.currentTimeMillis() - startTime);
+        return new ApiResponse<>().setMessageSuccess("Xuất file thành công tại: " + filePath);
+    }
+
+    // Hàm mapping (có thể dùng MapStruct để code gọn hơn)
+    private BlackFridaySaleExcelDTO mapToDto(BlackFridaySale entity) {
+        return BlackFridaySaleExcelDTO.builder()
+                .id(entity.getId())
+                .msg(entity.getMsg())
+                .userId(entity.getUserId())
+                .build();
+    }
 }

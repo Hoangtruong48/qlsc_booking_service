@@ -8,10 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 @RequestMapping("/booking")
@@ -29,6 +26,18 @@ public class BookingController {
         LOG.info("End get tine badminton");
         return response;
     }
+
+    @PostMapping("cusor-paging-with-multi-thread-get-data")
+    public ApiResponse<?> cusorPagingWithMultiThreadGetData() {
+        return bookingService.cusorPagingWithMultiThreadGetData();
+    }
+
+    @PostMapping("stream-data-excel")
+    public ApiResponse<?> streamDataAlibabaExcel() {
+        return bookingService.streamDataAlibabaExcel();
+    }
+
+
 
 //    @PostMapping("/create-booking")
 //    public ApiResponse<?> createBooking(@RequestBody BookingRequest request) {

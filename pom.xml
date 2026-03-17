@@ -104,6 +104,12 @@
 			<artifactId>common_log</artifactId>
 			<version>1.0.0</version>
 		</dependency>
+
+		<dependency>
+			<groupId>com.alibaba</groupId>
+			<artifactId>easyexcel</artifactId>
+			<version>3.3.4</version>
+		</dependency>
 	</dependencies>
 
 	<build>

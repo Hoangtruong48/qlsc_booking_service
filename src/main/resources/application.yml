@@ -4,6 +4,11 @@ spring:
     username: postgres
     password: your_password
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15       # Đủ cho 10 luồng batch + 5 luồng API
+      minimum-idle: 3             # Luôn giữ 5 connection sẵn sàng để API phản hồi tức thì
+      connection-timeout: 30000   # Thời gian tối đa (ms) chờ mượn connection (30 giây)
+      max-lifetime: 1800000       # 30 phút. Tránh lỗi PostgreSQL tự động ngắt kết nối quá lâu
   jpa:
     hibernate:
       ddl-auto: update
@@ -12,7 +17,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
-  kafka:
+  Kafka:
     consumer:
       bootstrap-servers: localhost:9092
       group-id: booking-service-group

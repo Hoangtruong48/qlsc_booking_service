@@ -51,6 +51,8 @@ public class MultiThreadWithAI {
             }, executorService));
         }
 
+        System.out.println("Break for test thread run ");
+
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         executorService.shutdown();
 
