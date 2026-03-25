@@ -225,7 +225,15 @@ public class BookingService {
                 long start = minId + (i * chunkSize);
                 long end = (i == threadCount - 1) ? maxId : (start + chunkSize - 1);
 
-                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> processTaskByRange(start, end, limit), executor);
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> processTaskByRange(start, end, limit), executor)
+                        .orTimeout(1, TimeUnit.MINUTES)
+                        .whenComplete((result, ex) -> {
+                            if (ex != null) {
+                                LOG.error("Error processing range {}-{}: ", start, end, ex);
+                            } else {
+                                LOG.info("Completed range {}-{}", start, end);
+                            }
+                        });
 
                 futures.add(future);
             }
@@ -252,6 +260,8 @@ public class BookingService {
         LOG.info("Time to get data: {} ms", System.currentTimeMillis() - startTime);
         return response.setMessageSuccess("Xử lý thành công");
     }
+
+
 
     private void processTaskByRange(long startId, long endId, int step) {
         LOG.info("Thread {} start = {}, end = {}", Thread.currentThread().getName(), startId, endId);
@@ -282,7 +292,7 @@ public class BookingService {
         // 1. Khởi tạo EasyExcel Writer
         File file = new File(filePath);
         ExcelWriter excelWriter = null;
-        try  {
+        try {
             excelWriter = EasyExcel.write(file, BlackFridaySaleExcelDTO.class).build();
             Stream<BlackFridaySale> stream = blackFridaySaleRepo.streamAllData();
             // Khởi tạo Sheet

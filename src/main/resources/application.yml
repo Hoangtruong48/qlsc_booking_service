@@ -23,6 +23,19 @@ spring:
       group-id: booking-service-group
       properties:
         spring.json.trusted.packages: "*"
+  data :
+    redis:
+      host: 103.226.249.128
+      port: 20091
+      password: Dtsgroup@123
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8     # Số lượng kết nối tối đa
+          max-idle: 8       # Số kết nối rảnh rỗi tối đa
+          min-idle: 2       # Số kết nối rảnh rỗi tối thiểu duy trì
+          max-wait: -1ms    # Thời gian chờ khi pool cạn (-1 là chờ vô hạn)
 
 server:
   port: 8083

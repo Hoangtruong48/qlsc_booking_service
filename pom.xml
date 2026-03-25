@@ -110,6 +110,18 @@
 			<artifactId>easyexcel</artifactId>
 			<version>3.3.4</version>
 		</dependency>
+
+		<!-- Spring Data Redis -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
+		<!-- Commons Pool 2 (Bắt buộc phải có nếu muốn cấu hình lettuce pool) -->
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-pool2</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>

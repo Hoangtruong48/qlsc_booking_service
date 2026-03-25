@@ -113,7 +113,8 @@ public class BookingConsumer {
                     .filter(Objects::nonNull)
                     .toList();
 
-            List<String> lstMessageFailure = lstEntity.stream()
+            List<String> lstMessageFailure = lstEntity
+                    .stream()
                     .filter(x -> x.getStatus() == ProcessKafkaMessage.FAILURE)
                     .map(ProcessKafkaMessage::getMessageFailure)
                     .filter(Objects::nonNull)
