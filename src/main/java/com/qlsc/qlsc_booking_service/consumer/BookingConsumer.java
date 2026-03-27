@@ -3,16 +3,22 @@ package com.qlsc.qlsc_booking_service.consumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qlsc.qlsc_booking_service.dto.ProcessKafkaMessage;
 import com.qlsc.qlsc_booking_service.entity.BlackFridaySale;
+import com.qlsc.qlsc_booking_service.entity.OrderUser;
 import com.qlsc.qlsc_booking_service.repo.custom.BlackFridaySaleCustomRepo;
+import com.qlsc.qlsc_booking_service.repo.custom.OrderUserCustomRepo;
 import com.qlsc.qlsc_booking_service.service.BookingService;
+import com.qlsc.qlsc_booking_service.service.FlashSaleService;
 import com.qlsc.qlsc_common.constant.KafkaConstant;
 import com.qlsc.qlsc_common.event.TestEvent;
 import com.qlsc.qlsc_common.saga.BlackFridaySaleCommand;
 import com.qlsc.qlsc_common.saga.CreateBookingCommand;
+import com.qlsc.qlsc_common.util.AppUtils;
+import com.qlsc.qlsc_common.util.NumberQlscUtils;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -38,6 +44,9 @@ public class BookingConsumer {
     ObjectMapper objectMapper = new ObjectMapper();
     ExecutorService kafkaWorkerPool;
     BlackFridaySaleCustomRepo blackFridaySaleCustomRepo;
+
+    FlashSaleService flashSaleService;
+
     private final AtomicInteger totalMessageCounter = new AtomicInteger(0);
     private final AtomicLong totalTimeCounter = new AtomicLong(0);
     private static final int TARGET_MESSAGES = 5000;
@@ -60,6 +69,34 @@ public class BookingConsumer {
             LOG.error("Error parsing CreateBookingCommand", ex);
         }
     }
+
+    @KafkaListener(topics = KafkaConstant.TOPIC_FLASH_SALE, groupId = "flash-sale", containerFactory = "batchFactory")
+    public void listenBatchFlashSale(List<ConsumerRecord<String, String>> records, Acknowledgment ack) {
+        long startTime = System.currentTimeMillis();
+        LOG.info("List listener flash sale size = {}", records.size());
+
+        // parse message to entity
+
+        List<Long> listUsers = records.stream()
+                .map(record -> NumberQlscUtils.parseLong(record.value()))
+                .toList();
+
+        List<OrderUser> lstOrderUser = listUsers.stream().map(
+                x -> OrderUser.builder().userId(x).status(OrderUser.STATUS_INIT).build()
+        ).toList();
+
+        flashSaleService.processOrderBatch(lstOrderUser);
+
+
+
+
+        // insert database and update redisson
+
+        ack.acknowledge();
+
+
+    }
+
 
     @KafkaListener(topics = KafkaConstant.TOPIC_BOOKING_MULTI_THREAD, groupId = "test-1", containerFactory = "batchFactory")
     public void listenBatch(List<ConsumerRecord<String, String>> records, Acknowledgment ack) {

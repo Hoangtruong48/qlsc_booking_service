@@ -13,6 +13,7 @@ import com.qlsc.qlsc_booking_service.producer.BookingProducer;
 import com.qlsc.qlsc_booking_service.repo.jpa.BlackFridaySaleRepo;
 import com.qlsc.qlsc_booking_service.repo.jpa.BookingRepoJpa;
 import com.qlsc.qlsc_booking_service.request.BookingRequest;
+import com.qlsc.qlsc_booking_service.request.FlashSaleRequest;
 import com.qlsc.qlsc_common.constant.KafkaConstant;
 import com.qlsc.qlsc_common.constant.SagaConstant;
 import com.qlsc.qlsc_common.response.ApiResponse;
@@ -25,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +42,6 @@ import java.util.stream.Stream;
 
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-@RequiredArgsConstructor
 public class BookingService {
     Logger LOG = LoggerFactory.getLogger(this.getClass());
     BadmintonCourtManagementClient badmintonFeign;
@@ -48,6 +49,16 @@ public class BookingService {
     BookingProducer bookingProducer;
     BlackFridaySaleRepo blackFridaySaleRepo;
     EntityManager entityManager;
+
+    @Autowired
+    public BookingService(BadmintonCourtManagementClient badmintonFeign, BookingRepoJpa bookingRepoJpa, BookingProducer bookingProducer, BlackFridaySaleRepo blackFridaySaleRepo, EntityManager entityManager) {
+        this.badmintonFeign = badmintonFeign;
+        this.bookingRepoJpa = bookingRepoJpa;
+        this.bookingProducer = bookingProducer;
+        this.blackFridaySaleRepo = blackFridaySaleRepo;
+        this.entityManager = entityManager;
+    }
+
 
     public ApiResponse<?> getBadmintonFree(List<Integer> ids, Long bookingDate) {
         ApiResponse<List<CourtScheduleDTO>> response = new ApiResponse<>();
@@ -260,7 +271,6 @@ public class BookingService {
         LOG.info("Time to get data: {} ms", System.currentTimeMillis() - startTime);
         return response.setMessageSuccess("Xử lý thành công");
     }
-
 
 
     private void processTaskByRange(long startId, long endId, int step) {

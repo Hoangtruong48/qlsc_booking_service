@@ -1,7 +1,10 @@
 package com.qlsc.qlsc_booking_service.controller;
 
 import com.htruong48.common_log.annotaion.TraceName;
+import com.qlsc.qlsc_booking_service.request.FlashSaleRequest;
+import com.qlsc.qlsc_booking_service.request.OrderRequest;
 import com.qlsc.qlsc_booking_service.service.BookingService;
+import com.qlsc.qlsc_booking_service.service.FlashSaleService;
 import com.qlsc.qlsc_common.response.ApiResponse;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +23,7 @@ import java.util.List;
 public class BookingController {
     Logger LOG = LoggerFactory.getLogger(this.getClass());
     BookingService bookingService;
+    FlashSaleService flashService;
     @GetMapping("/get-time-badminton")
     @TraceName("get-free-badminton")
     public ApiResponse<?> getBadmintonFree(@RequestParam List<Integer> ids, @RequestParam Long bookingDate) {
@@ -49,6 +53,17 @@ public class BookingController {
 //        LOG.info("{} End create booking badminton  req = {}", keyLog, request);
 //        return response;
 //    }
+
+    @PostMapping("/buy-flash-sale")
+    public ApiResponse<?> buyFlashSale(@RequestBody FlashSaleRequest request) {
+        request.setValueUserId();
+        return flashService.buyFlashSale(request);
+    }
+
+    @PutMapping("/accept-order")
+    public ApiResponse<?> acceptOrder(@RequestBody OrderRequest request) {
+        return flashService.acceptOrder(request);
+    }
 
 
 }
