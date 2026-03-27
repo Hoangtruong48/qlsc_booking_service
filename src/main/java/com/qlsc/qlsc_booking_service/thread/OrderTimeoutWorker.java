@@ -7,6 +7,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.redisson.api.RBlockingQueue;
+import org.redisson.api.RDelayedQueue;
 import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,15 +28,37 @@ public class OrderTimeoutWorker implements ApplicationRunner {
     Logger log = LoggerFactory.getLogger(this.getClass());
 
     @Override
-    public void run(ApplicationArguments args) throws Exception {
+    public void run(ApplicationArguments args) {
+        log.info("OrderTimeoutWorker is running...");
+
         executorService.submit(() -> {
             RBlockingQueue<Long> queue = redissonClient.getBlockingQueue(RedisConstant.KEY_QUEUE_FLASH_SALE);
+            RDelayedQueue<Long> delayedQueue = redissonClient.getDelayedQueue(queue);
+
+            log.info(" Bắt đầu đứng canh gác hòm thư: {}", RedisConstant.KEY_QUEUE_FLASH_SALE);
+
             while (!Thread.currentThread().isInterrupted()) {
+                Long orderId = null; // Khai báo ở ngoài để catch có thể log ra được
                 try {
-                    Long orderId = queue.take();
+                    // Code sẽ block (dừng lại) ở dòng này cho đến khi có đơn rớt xuống
+                    orderId = queue.take();
+
+                    // NẾU REDISSON NHẢ ĐỒ, DÒNG LOG NÀY SẼ HIỆN LÊN
+                    log.info(" [BING!] Bắt được đơn hàng hết hạn: ID = {}", orderId);
+
                     flashSaleService.checkCancelOrder(orderId);
+
+                    log.info(" Xử lý hủy đơn ID = {} thành công!", orderId);
+
                 } catch (InterruptedException exception) {
-                    log.info("Thread interrupted from redisson queue.");
+                    log.warn(" Thread interrupted from redisson queue.");
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    // [TỬ HUYỆT ĐƯỢC BẢO VỆ]
+                    // Nếu lỗi SQL hay bất cứ lỗi gì, nó sẽ chạy vào đây, in lỗi ra,
+                    // nhưng vòng lặp while vẫn tiếp tục chạy để chộp đơn hàng tiếp theo!
+                    log.error(" Lỗi nghiêm trọng khi xử lý đơn hàng ID = {}", orderId, e);
                 }
             }
         });
@@ -43,6 +66,7 @@ public class OrderTimeoutWorker implements ApplicationRunner {
 
     @PreDestroy
     public void destroy() {
+        log.info("🧹 Đóng luồng canh gác Redisson...");
         executorService.shutdown();
     }
 }

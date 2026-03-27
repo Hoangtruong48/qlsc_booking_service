@@ -14,6 +14,8 @@ import lombok.experimental.FieldDefaults;
 import org.redisson.api.RBlockingQueue;
 import org.redisson.api.RDelayedQueue;
 import org.redisson.api.RedissonClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -34,6 +36,7 @@ public class FlashSaleService {
     OrderUserCustomRepo orderUserCustomRepo;
     RedissonClient redissonClient;
     OrderUserRepo orderUserRepo;
+    Logger log = LoggerFactory.getLogger(this.getClass());
 
     @Autowired
     public FlashSaleService(StringRedisTemplate stringRedisTemplate, BookingProducer bookingProducer,
@@ -82,13 +85,17 @@ public class FlashSaleService {
         RBlockingQueue<Long> blockingQueue = redissonClient.getBlockingQueue(RedisConstant.KEY_QUEUE_FLASH_SALE);
         RDelayedQueue<Long> delayedQueue = redissonClient.getDelayedQueue(blockingQueue);
 
-        for (OrderUser order : lstOrderUser) {
+        for (OrderUser order : lst) {
 
             Long orderIdStr = order.getId();
 
             // 3. Cài 500 quả bom hẹn giờ ĐỘC LẬP cho 500 cái ID này
-            delayedQueue.offer(orderIdStr, 15, TimeUnit.MINUTES);
+            delayedQueue.offer(orderIdStr, 5, TimeUnit.MINUTES);
         }
+
+        log.info("size queue = {}", delayedQueue.size());
+
+
 
     }
 

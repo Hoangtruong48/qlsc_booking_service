@@ -41,7 +41,7 @@ public class OrderUserCustomRepo {
 
     // Tách riêng logic build SQL ra một hàm private cho sạch code
     private List<OrderUser> executeInsertChunk(List<OrderUser> chunkToSave) {
-        StringBuilder sql = new StringBuilder("INSERT INTO orders (user_id, status) VALUES ");
+        StringBuilder sql = new StringBuilder("INSERT INTO order_user (user_id, status) VALUES ");
         List<Object> params = new ArrayList<>();
 
         for (int i = 0; i < chunkToSave.size(); i++) {

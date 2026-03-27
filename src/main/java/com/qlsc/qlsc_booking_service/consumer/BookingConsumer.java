@@ -70,31 +70,66 @@ public class BookingConsumer {
         }
     }
 
+//    @KafkaListener(topics = KafkaConstant.TOPIC_FLASH_SALE, groupId = "flash-sale", containerFactory = "batchFactory")
+//    public void listenBatchFlashSale(List<ConsumerRecord<String, String>> records, Acknowledgment ack) {
+//        long startTime = System.currentTimeMillis();
+//        LOG.info("List listener flash sale size = {}", records.size());
+//
+//        // parse message to entity
+//
+//        List<Long> listUsers = records.stream()
+//                .map(record -> NumberQlscUtils.parseLong(record.value()))
+//                .toList();
+//
+//        List<OrderUser> lstOrderUser = listUsers.stream().map(
+//                x -> OrderUser.builder().userId(x).status(OrderUser.STATUS_INIT).build()
+//        ).toList();
+//
+//        flashSaleService.processOrderBatch(lstOrderUser);
+//
+//
+//
+//
+//        // insert database and update redisson
+//
+//        ack.acknowledge();
+//
+//
+//    }
+
     @KafkaListener(topics = KafkaConstant.TOPIC_FLASH_SALE, groupId = "flash-sale", containerFactory = "batchFactory")
     public void listenBatchFlashSale(List<ConsumerRecord<String, String>> records, Acknowledgment ack) {
         long startTime = System.currentTimeMillis();
-        LOG.info("List listener flash sale size = {}", records.size());
+        LOG.info("📦 [KAFKA CONSUMER] Bắt đầu nhận mẻ Batch Flash Sale. Số lượng: {}", records.size());
 
-        // parse message to entity
+        try {
+            // 1. Parse message to entity
+            List<Long> listUsers = records.stream()
+                    .map(record -> NumberQlscUtils.parseLong(record.value()))
+                    .toList();
 
-        List<Long> listUsers = records.stream()
-                .map(record -> NumberQlscUtils.parseLong(record.value()))
-                .toList();
+            List<OrderUser> lstOrderUser = listUsers.stream().map(
+                    x -> OrderUser.builder().userId(x).status(OrderUser.STATUS_INIT).build()
+            ).toList();
 
-        List<OrderUser> lstOrderUser = listUsers.stream().map(
-                x -> OrderUser.builder().userId(x).status(OrderUser.STATUS_INIT).build()
-        ).toList();
+            // 2. Insert database and update redisson
+            flashSaleService.processOrderBatch(lstOrderUser);
 
-        flashSaleService.processOrderBatch(lstOrderUser);
+            // 3. Chỉ Acknowledge (xác nhận đã xong) khi mọi thứ THỰC SỰ THÀNH CÔNG
+            ack.acknowledge();
 
+            LOG.info(" [KAFKA CONSUMER] Xử lý thành công lô {} đơn hàng trong {} ms",
+                    records.size(), (System.currentTimeMillis() - startTime));
 
+        } catch (Exception e) {
+            // [CÚ CHỐT HẠ NẰM Ở ĐÂY]
+            // Tham số 'e' ở cuối cùng sẽ bung toàn bộ Stack Trace (dòng code gây lỗi) ra màn hình Console
+            LOG.error(" [KAFKA CONSUMER] LỖI CHÍ MẠNG KHI XỬ LÝ BATCH FLASH SALE!", e);
 
-
-        // insert database and update redisson
-
-        ack.acknowledge();
-
-
+            // Bạn ném ngược lỗi ra ngoài để Spring Kafka biết mẻ này đã thất bại (Không được tự động commit)
+            // Nếu cấu hình Retry, nó sẽ thử lại mẻ này.
+            throw new RuntimeException("Thất bại khi xử lý Kafka Batch", e);
+        }
     }
 
 
